@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Space Invaders</title>
+    <style>
+        body {
+            background-color: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Courier New', Courier, monospace;
+            color: white;
+        }
+        /* Container para permitir sobrepor o menu em cima do canvas */
+        #container-jogo {
+            position: relative;
+            width: 800px;
+            height: 600px;
+        }
+        canvas {
+            background-color: black;
+            border: 2px solid white;
+            display: block;
+        }
+        /* Estilo das telas de Menu e Game Over */
+        .tela-sobreposta {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        h1 {
+            font-size: 48px;
+            color: #00FF00;
+            margin-bottom: 10px;
+        }
+        button {
+            margin-top: 20px;
+            padding: 15px 40px;
+            font-size: 24px;
+            font-family: inherit;
+            font-weight: bold;
+            background-color: #00FF00;
+            color: black;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        button:hover {
+            background-color: #00cc00;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="container-jogo">
+        <canvas id="tela" width="800" height="600"></canvas>
+
+        <!-- TELA INICIAL -->
+        <div id="tela-inicio" class="tela-sobreposta">
+            <h1>SPACE INVADERS</h1>
+            <p>Use as setas ⬅️ ➡️ para mover e ESPAÇO para atirar</p>
+            <button onclick="iniciarJogo()">JOGAR</button>
+        </div>
+
+        <!-- TELA DE FIM DE JOGO (Começa escondida) -->
+        <div id="tela-fim" class="tela-sobreposta" style="display: none;">
+            <h1 id="titulo-fim">GAME OVER</h1>
+            <p id="resumo-fim" style="font-size: 20px;"></p>
+            <button onclick="iniciarJogo()">JOGAR NOVAMENTE</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("tela");
+        const pincel = canvas.getContext("2d");
+
+        // 1. CARREGANDO IMAGENS
+        const imgNave1 = new Image();
+        imgNave1.src = "img/nave1.png";
+
+        const imagensAlien = [];
+        for (let i = 1; i <= 4; i++) {
+            let img = new Image();
+            img.src = `img/alien${i}.png`;
+            imagensAlien.push(img);
+        }
+
+        // 2. VARIÁVEIS DE ESTADO DO JOGO
+        let estadoJogo = "MENU"; // Pode ser: "MENU", "JOGANDO", "FIM"
+        let pontos = 0;
+        let vidas = 3;
+        let tempoSegundos = 0;
+        let intervaloTempo = null;
+
+        let nave = { x: 375, y: 520, largura: 50, altura: 50, velocidade: 6 };
+        let inimigos = [];
+        let direcaoInimigos = 1;
+        let velocidadeInimigos = 1.5;
+        let tiros = [];
+        let podeAtirar = true;
+        let teclas = {};
+
+        // 3. FUNÇÃO PARA CRIAR/REINICIAR A HORDA DE ALIENS
+        function criarInimigos() {
+            inimigos = [];
+            direcaoInimigos = 1;
+            for (let linha = 0; linha < 4; linha++) {
+                for (let coluna = 0; coluna < 8; coluna++) {
+                    inimigos.push({
+                        x: 80 + (coluna * 75),
+                        y: 60 + (linha * 55),
+                        largura: 40,
+                        altura: 40,
+                        imagem: imagensAlien[linha]
+                    });
+                }
+            }
+        }
+
+        // 4. INICIAR OU REINICIAR A PARTIDA
+        function iniciarJogo() {
+            // Esconde as telas de menu e fim
+            document.getElementById("tela-inicio").style.display = "none";
+            document.getElementById("tela-fim").style.display = "none";
+
+            // Reseta valores
+            pontos = 0;
+            vidas = 3;
+            tempoSegundos = 0;
+            tiros = [];
+            nave.x = 375;
+            criarInimigos();
+
+            // Inicia o temporizador (soma 1 a cada 1000ms = 1 segundo)
+            clearInterval(intervaloTempo);
+            intervaloTempo = setInterval(() => {
+                if (estadoJogo === "JOGANDO") {
+                    tempoSegundos++;
+                }
+            }, 1000);
+
+            estadoJogo = "JOGANDO";
+        }
+
+        // 5. FINALIZAR A PARTIDA (VITÓRIA OU DERROTA)
+        function finalizarJogo(venceu) {
+            estadoJogo = "FIM";
+            clearInterval(intervaloTempo); // Para o relógio
+
+            const titulo = document.getElementById("titulo-fim");
+            const resumo = document.getElementById("resumo-fim");
+
+            if (venceu) {
+                titulo.innerText = "VOCÊ VENCEU!";
+                titulo.style.color = "#00FF00";
+            } else {
+                titulo.innerText = "GAME OVER";
+                titulo.style.color = "red";
+            }
+
+            resumo.innerText = `Pontuação: ${pontos} | Tempo: ${tempoSegundos}s`;
+            document.getElementById("tela-fim").style.display = "flex";
+        }
+
+        // CONTROLES DO TECLADO
+        window.addEventListener("keydown", function(evento) {
+            teclas[evento.key] = true;
+
+            if (estadoJogo === "JOGANDO" && evento.key === " " && podeAtirar) {
+                tiros.push({
+                    x: nave.x + (nave.largura / 2) - 2,
+                    y: nave.y,
+                    largura: 4,
+                    altura: 15,
+                    velocidade: 8
+                });
+                podeAtirar = false;
+                setTimeout(() => podeAtirar = true, 300);
+            }
+        });
+
+        window.addEventListener("keyup", function(evento) {
+            teclas[evento.key] = false;
+        });
+
+        // 6. ATUALIZAÇÃO DA LÓGICA
+        function atualizar() {
+            if (estadoJogo !== "JOGANDO") return; // Não faz nada se estiver no menu
+
+            // Mover Nave
+            if (teclas["ArrowLeft"] && nave.x > 0) nave.x -= nave.velocidade;
+            if (teclas["ArrowRight"] && nave.x < canvas.width - nave.largura) nave.x += nave.velocidade;
+
+            // Mover Tiros
+            for (let i = tiros.length - 1; i >= 0; i--) {
+                tiros[i].y -= tiros[i].velocidade;
+                if (tiros[i].y < 0) tiros.splice(i, 1);
+            }
+
+            // Mover Inimigos
+            let baterNaParede = false;
+            for (let i = 0; i < inimigos.length; i++) {
+                inimigos[i].x += velocidadeInimigos * direcaoInimigos;
+                if (inimigos[i].x + inimigos[i].largura >= canvas.width || inimigos[i].x <= 0) {
+                    baterNaParede = true;
+                }
+            }
+
+            if (baterNaParede) {
+                direcaoInimigos *= -1;
+                for (let i = 0; i < inimigos.length; i++) {
+                    inimigos[i].y += 25; // Desce uma linha
+                }
+            }
+
+            // Colisão: Tiro acertando Alien
+            for (let i = tiros.length - 1; i >= 0; i--) {
+                for (let j = inimigos.length - 1; j >= 0; j--) {
+                    let t = tiros[i];
+                    let b = inimigos[j];
+
+                    if (t && b &&
+                        t.x < b.x + b.largura && t.x + t.largura > b.x &&
+                        t.y < b.y + b.altura && t.y + t.altura > b.y) {
+                        
+                        tiros.splice(i, 1);
+                        inimigos.splice(j, 1);
+                        pontos += 10; // Ganha 10 pontos por alien!
+                        break;
+                    }
+                }
+            }
+
+            // Colisão: Alien encostando na Nave ou chegando no fundo
+            for (let i = 0; i < inimigos.length; i++) {
+                let b = inimigos[i];
+                let encostouNaNave = (
+                    b.x < nave.x + nave.largura &&
+                    b.x + b.largura > nave.x &&
+                    b.y < nave.y + nave.altura &&
+                    b.y + b.altura > nave.y
+                );
+
+                if (encostouNaNave || b.y + b.altura >= canvas.height) {
+                    vidas--; // Recebe dano (perde 1 vida)
+
+                    if (vidas <= 0) {
+                        finalizarJogo(false); // Acabaram as vidas -> Game Over
+                        return;
+                    } else {
+                        // Empurra os aliens de volta para o topo para você continuar jogando
+                        for (let k = 0; k < inimigos.length; k++) {
+                            inimigos[k].y -= 150;
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // Verifica Vitória (destruiu todos os aliens)
+            if (inimigos.length === 0) {
+                finalizarJogo(true);
+            }
+        }
+
+        // 7. DESENHO NA TELA
+        function desenhar() {
+            pincel.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Desenha Nave
+            pincel.drawImage(imgNave1, nave.x, nave.y, nave.largura, nave.altura);
+
+            // Desenha Inimigos
+            for (let i = 0; i < inimigos.length; i++) {
+                let alien = inimigos[i];
+                pincel.drawImage(alien.imagem, alien.x, alien.y, alien.largura, alien.altura);
+            }
+
+            // Desenha Tiros
+            pincel.fillStyle = "yellow";
+            for (let i = 0; i < tiros.length; i++) {
+                let t = tiros[i];
+                pincel.fillRect(t.x, t.y, t.largura, t.altura);
+            }
+
+            // --- PLACAR SUPERIOR (HUD) ---
+            pincel.fillStyle = "white";
+            pincel.font = "bold 20px 'Courier New'";
+            pincel.fillText(`PONTOS: ${pontos}`, 20, 30);
+            pincel.fillText(`TEMPO: ${tempoSegundos}s`, 340, 30);
+            pincel.fillText(`VIDAS: ${"❤️".repeat(vidas)}`, 630, 30);
+        }
+
+        function loopDoJogo() {
+            atualizar();
+            desenhar();
+            requestAnimationFrame(loopDoJogo);
+        }
+
+        loopDoJogo();
+    </script>
+
+</body>
+</html>
